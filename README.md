@@ -18,10 +18,6 @@ A modern React-based decentralized exchange (DEX) aggregator that finds the best
 - 🔍 **Token Search** - Easy token selection with search functionality
 - 💸 **Gas Optimization** - Shows gas costs in ETH and USD
 
-## 🚀 Demo
-
-[Live Demo](https://your-demo-link.com) | [Video Walkthrough](https://your-video-link.com)
-
 ## 📦 Tech Stack
 
 - **Frontend**: React 18, TypeScript, Vite
@@ -42,7 +38,7 @@ A modern React-based decentralized exchange (DEX) aggregator that finds the best
 ### Clone & Setup
 
 Clone the repository
-git clone https://github.com/yourusername/velora-dex-aggregator.git
+git clone https://github.com/usetech-nick/velora-dex-aggregator.git
 cd velora-dex-aggregator
 
 Install dependencies
