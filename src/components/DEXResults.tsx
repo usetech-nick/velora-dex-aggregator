@@ -1,5 +1,5 @@
 import React from "react";
-import { TrendingUp, Zap, DollarSign, Percent, Clock } from "lucide-react";
+import { TrendingUp, DollarSign, Percent, Clock } from "lucide-react";
 
 interface DEXRoute {
   exchange: string;
