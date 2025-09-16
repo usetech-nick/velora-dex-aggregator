@@ -22,6 +22,10 @@ function SwapInterface() {
   const [gasCost, setGasCost] = useState("0");
   const [gasUSD, setGasUSD] = useState("0");
 
+  // ADD THESE NEW STATE VARIABLES
+  const [selectedRoute, setSelectedRoute] = useState<number>(0);
+  const [slippageTolerance, setSlippageTolerance] = useState<number>(0.5);
+
   const { isConnected, address } = useAccount();
   const chainId = useChainId();
   const { getSwapQuote, loading, error } = useVelora();
@@ -41,7 +45,18 @@ function SwapInterface() {
       setTotalOutput(result.quote.destAmount);
       setGasCost(result.quote.gasCost);
       setGasUSD(result.quote.gasUSD || "0");
+      // Reset selected route when new results come in
+      setSelectedRoute(0);
     }
+  };
+
+  // ADD THESE HANDLER FUNCTIONS
+  const handleRouteSelect = (routeIndex: number) => {
+    setSelectedRoute(routeIndex);
+  };
+
+  const handleSlippageChange = (slippage: number) => {
+    setSlippageTolerance(slippage);
   };
 
   const swapTokens = () => {
@@ -136,6 +151,52 @@ function SwapInterface() {
                   />
                 </div>
 
+                {/* ADD SLIPPAGE TOLERANCE CONTROLS */}
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-gray-700">
+                      Slippage Tolerance
+                    </label>
+                    <span className="text-sm text-gray-600">
+                      {slippageTolerance.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex space-x-2">
+                    {[0.1, 0.5, 1.0, 3.0].map((value) => (
+                      <button
+                        key={value}
+                        onClick={() => handleSlippageChange(value)}
+                        className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          slippageTolerance === value
+                            ? "bg-blue-500 text-white"
+                            : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {value}%
+                      </button>
+                    ))}
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      max="50"
+                      className="flex-1 px-2 py-2 text-sm border border-gray-300 rounded"
+                      placeholder="Custom"
+                      onChange={(e) =>
+                        handleSlippageChange(parseFloat(e.target.value) || 0.5)
+                      }
+                    />
+                  </div>
+                  {slippageTolerance > 3 && (
+                    <div className="mt-2 text-sm text-orange-600 flex items-center space-x-1">
+                      <span>⚠️</span>
+                      <span>
+                        High slippage may result in unfavorable trades
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 {error && (
                   <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <AlertCircle className="h-5 w-5 text-red-500" />
@@ -166,6 +227,9 @@ function SwapInterface() {
             gasCost={gasCost}
             gasUSD={gasUSD}
             loading={loading}
+            selectedRoute={selectedRoute}
+            onRouteSelect={handleRouteSelect}
+            slippageTolerance={slippageTolerance}
           />
         </div>
       </div>

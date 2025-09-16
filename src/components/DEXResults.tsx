@@ -1,5 +1,11 @@
 import React from "react";
-import { TrendingUp, DollarSign, Percent, Clock } from "lucide-react";
+import {
+  TrendingUp,
+  DollarSign,
+  Percent,
+  Clock,
+  ArrowRight,
+} from "lucide-react";
 
 interface DEXRoute {
   exchange: string;
@@ -9,6 +15,9 @@ interface DEXRoute {
   gasEstimate?: string;
   priceImpact?: number;
   data?: any;
+  selected?: boolean;
+  estimatedTime?: string;
+  totalCostUSD?: string;
 }
 
 interface DEXResultsProps {
@@ -17,14 +26,21 @@ interface DEXResultsProps {
   gasCost: string;
   gasUSD?: string;
   loading: boolean;
+  onRouteSelect?: (routeIndex: number) => void;
+  selectedRoute?: number;
+  slippageTolerance?: number;
+  onSwap?: () => void; // ADD THIS FOR SWAP FUNCTIONALITY
 }
 
 export const DEXResults: React.FC<DEXResultsProps> = ({
   routes,
-  totalDestAmount,
   gasCost,
   gasUSD,
   loading,
+  onRouteSelect,
+  selectedRoute = 0, // Default to first route
+  slippageTolerance,
+  onSwap,
 }) => {
   if (loading) {
     return (
@@ -49,6 +65,9 @@ export const DEXResults: React.FC<DEXResultsProps> = ({
       </div>
     );
   }
+
+  // GET SELECTED ROUTE DATA
+  const currentRoute = routes[selectedRoute] || routes[0];
 
   // Enhanced DEX styling function
   const getDEXStyle = (exchangeName: string) => {
@@ -116,10 +135,11 @@ export const DEXResults: React.FC<DEXResultsProps> = ({
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900">DEX Routes</h3>
         <div className="text-right">
+          {/* CHANGED: Show selected route output instead of total */}
           <div className="text-2xl font-bold text-green-600">
-            {formatTokenAmount(totalDestAmount)}
+            {formatTokenAmount(currentRoute.destAmount)}
           </div>
-          <div className="text-sm text-gray-500">Total Output</div>
+          <div className="text-sm text-gray-500">Selected Output</div>
         </div>
       </div>
 
@@ -130,66 +150,241 @@ export const DEXResults: React.FC<DEXResultsProps> = ({
           return (
             <div
               key={index}
-              className="p-4 bg-gray-50 rounded-lg border border-gray-100 hover:bg-gray-100 transition-colors"
+              className={`p-4 rounded-lg border transition-all cursor-pointer ${
+                selectedRoute === index
+                  ? "bg-blue-50 border-blue-200 shadow-md ring-2 ring-blue-100"
+                  : "bg-gray-50 border-gray-100 hover:bg-gray-100 hover:border-gray-200"
+              }`}
+              onClick={() => onRouteSelect?.(index)}
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-3">
-                  <div
-                    className={`w-10 h-10 bg-gradient-to-r ${dexStyle.gradient} rounded-full flex items-center justify-center text-white font-bold shadow-sm`}
-                  >
-                    <span className="text-sm">{dexStyle.icon}</span>
+                  {/* Selection indicator */}
+                  <div className="relative">
+                    {selectedRoute === index && (
+                      <div className="absolute -left-1 -top-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-sm"></div>
+                    )}
+                    <div
+                      className={`w-10 h-10 bg-gradient-to-r ${
+                        dexStyle.gradient
+                      } rounded-full flex items-center justify-center text-white font-bold shadow-sm ${
+                        selectedRoute === index ? "ring-2 ring-blue-200" : ""
+                      }`}
+                    >
+                      <span className="text-sm">{dexStyle.icon}</span>
+                    </div>
                   </div>
                   <div>
-                    <div className="font-medium text-gray-900">
-                      {route.exchange}
+                    <div className="flex items-center space-x-2">
+                      <div className="font-medium text-gray-900">
+                        {route.exchange}
+                      </div>
+                      {selectedRoute === index && (
+                        <span className="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">
+                          Selected
+                        </span>
+                      )}
                     </div>
-                    <div className="text-sm text-gray-500 flex items-center space-x-3">
+
+                    {/* Enhanced route information grid */}
+                    <div className="text-sm text-gray-500 grid grid-cols-2 gap-2 mt-2">
                       <span className="flex items-center space-x-1">
                         <Percent className="h-3 w-3" />
                         <span>{route.percent.toFixed(1)}% of trade</span>
                       </span>
-                      {route.priceImpact && route.priceImpact > 0 && (
-                        <span className="text-orange-600">
-                          {route.priceImpact.toFixed(2)}% impact
+
+                      <span className="flex items-center space-x-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{route.estimatedTime || "~15s"}</span>
+                      </span>
+
+                      {route.priceImpact && route.priceImpact >= 0 && (
+                        <span
+                          className={`flex items-center space-x-1 ${
+                            route.priceImpact < 0.1
+                              ? "text-green-600"
+                              : route.priceImpact < 1
+                              ? "text-yellow-600"
+                              : route.priceImpact < 3
+                              ? "text-orange-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          <span>Impact: {route.priceImpact.toFixed(2)}%</span>
+                        </span>
+                      )}
+
+                      {route.gasEstimate && (
+                        <span className="text-gray-600 text-xs">
+                          Gas: ~$
+                          {route.totalCostUSD ||
+                            formatGasCost(route.gasEstimate)}
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
+
                 <div className="text-right">
                   <div className="font-medium text-gray-900">
                     {formatTokenAmount(route.destAmount)}
                   </div>
                   <div className="text-sm text-gray-500">Output</div>
+
+                  {/* Minimum received with slippage */}
+                  {slippageTolerance && (
+                    <div className="text-xs text-gray-400 mt-1">
+                      Min:{" "}
+                      {formatTokenAmount(
+                        (
+                          parseFloat(route.destAmount) *
+                          (1 - slippageTolerance / 100)
+                        ).toString()
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Price comparison indicator */}
+              {routes.length > 1 && (
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center space-x-2">
+                    {index === 0 ? (
+                      <span className="px-2 py-1 text-green-700 bg-green-100 rounded-full font-medium">
+                        Best Rate
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">
+                        {(
+                          ((parseFloat(routes[0].destAmount) -
+                            parseFloat(route.destAmount)) /
+                            parseFloat(routes[0].destAmount)) *
+                          100
+                        ).toFixed(2)}
+                        % less
+                      </span>
+                    )}
+                  </div>
+
+                  {selectedRoute === index && (
+                    <div className="flex items-center space-x-1 text-blue-600">
+                      <span>✓</span>
+                      <span>Active Route</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* High impact warning */}
+              {route.priceImpact && route.priceImpact > 1 && (
+                <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs">
+                  <div className="flex items-center space-x-1 text-orange-700">
+                    <span>⚠️</span>
+                    <span className="font-medium">High Price Impact</span>
+                  </div>
+                  <p className="text-orange-600 mt-1">
+                    This trade may significantly move the price. Consider
+                    smaller amounts.
+                  </p>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      <div className="space-y-3 pt-4 border-t border-gray-200">
+      {/* CHANGED: Selected Route Details Section */}
+      <div className="border-t border-gray-200 pt-4 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <DollarSign className="h-5 w-5 text-gray-400" />
-            <span className="text-sm text-gray-600">Est. Gas Cost</span>
-          </div>
-          <div className="text-right">
-            <span className="font-medium">{formatGasCost(gasCost)} ETH</span>
-            {gasUSD && parseFloat(gasUSD) > 0 && (
-              <div className="text-sm text-gray-500">
-                ${formatNumber(gasUSD)}
-              </div>
-            )}
+          <h4 className="text-sm font-medium text-gray-700">
+            Selected Route Details
+          </h4>
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <span>via</span>
+            <span className="font-medium text-gray-900">
+              {currentRoute.exchange}
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Clock className="h-5 w-5 text-gray-400" />
-            <span className="text-sm text-gray-600">Est. Time</span>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <DollarSign className="h-4 w-4 text-gray-400" />
+              <span className="text-gray-600">Gas Cost</span>
+            </div>
+            <div className="text-right">
+              <span className="font-medium">
+                {formatGasCost(currentRoute.gasEstimate || gasCost)} ETH
+              </span>
+              <div className="text-xs text-gray-500">
+                ${currentRoute.totalCostUSD || gasUSD || "0"}
+              </div>
+            </div>
           </div>
-          <span className="font-medium text-sm">~15 seconds</span>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Clock className="h-4 w-4 text-gray-400" />
+              <span className="text-gray-600">Est. Time</span>
+            </div>
+            <span className="font-medium">
+              {currentRoute.estimatedTime || "~15s"}
+            </span>
+          </div>
+        </div>
+
+        {/* Price Impact Warning for Selected Route */}
+        {currentRoute.priceImpact && currentRoute.priceImpact > 0.5 && (
+          <div
+            className={`p-3 rounded-lg ${
+              currentRoute.priceImpact > 1
+                ? "bg-orange-50 border border-orange-200"
+                : "bg-yellow-50 border border-yellow-200"
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <span>{currentRoute.priceImpact > 1 ? "⚠️" : "💡"}</span>
+              <span
+                className={`text-sm font-medium ${
+                  currentRoute.priceImpact > 1
+                    ? "text-orange-800"
+                    : "text-yellow-800"
+                }`}
+              >
+                {currentRoute.priceImpact.toFixed(2)}% Price Impact
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* SWAP BUTTON */}
+        <button
+          onClick={onSwap}
+          disabled={!currentRoute || !currentRoute.destAmount}
+          className="w-full mt-4 py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold rounded-lg shadow-lg transition-all duration-200 transform hover:scale-[1.02] disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+        >
+          <span>
+            {currentRoute?.destAmount ? "Execute Swap" : "Select Route to Swap"}
+          </span>
+          <ArrowRight className="h-5 w-5" />
+        </button>
+
+        {/* Additional swap info */}
+        <div className="text-center text-xs text-gray-500 mt-2">
+          You will receive at least{" "}
+          <span className="font-medium text-gray-700">
+            {slippageTolerance
+              ? formatTokenAmount(
+                  (
+                    parseFloat(currentRoute.destAmount || "0") *
+                    (1 - slippageTolerance / 100)
+                  ).toString()
+                )
+              : formatTokenAmount(currentRoute.destAmount || "0")}
+          </span>{" "}
+          tokens or the transaction will revert
         </div>
       </div>
     </div>
